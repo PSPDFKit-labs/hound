@@ -39,6 +39,12 @@ defmodule Hound.RequestUtils do
       true ->
         {[], ""}
     end
+
+    IO.inspect(type)
+    IO.inspect(url)
+    IO.inspect(headers)
+    IO.inspect(body)
+
     IO.inspect("@http_options")
     IO.inspect([:with_body | @http_options])
     IO.inspect(DateTime.utc_now)
