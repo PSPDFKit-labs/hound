@@ -40,9 +40,14 @@ defmodule Hound.RequestUtils do
         {[], ""}
     end
     IO.inspect("@http_options")
-    IO.inspect(@http_options)
-    :hackney.request(type, url, headers, body, [:with_body | @http_options])
+    IO.inspect([:with_body | @http_options])
+    res = :hackney.request(type, url, headers, body, [:with_body | @http_options])
     |> handle_response({url, path, type}, options)
+
+    IO.inspect("res")
+    IO.inspect(res)
+
+    res
   end
 
   defp handle_response({:ok, code, headers, body}, {url, path, type}, options) do
