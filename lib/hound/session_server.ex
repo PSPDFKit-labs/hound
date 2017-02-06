@@ -62,6 +62,8 @@ defmodule Hound.SessionServer do
   def handle_call({:change_session, pid, session_name, opts}, _from, state) do
     {:ok, driver_info} = Hound.driver_info
 
+    IO.inspect("handle_call_1")
+
     {ref, sessions} =
       case :ets.lookup(@name, pid) do
         [{^pid, ref, _session_id, sessions}] ->
@@ -70,14 +72,21 @@ defmodule Hound.SessionServer do
           {Process.monitor(pid), %{}}
       end
 
+    IO.inspect("handle_call_2")
+
     {session_id, sessions} =
       case Map.fetch(sessions, session_name) do
         {:ok, session_id} ->
           {session_id, sessions}
         :error ->
+          IO.puts("before create_session")
           {:ok, session_id} = Hound.Session.create_session(driver_info[:browser], opts)
+          IO.puts("after create_session")
           {session_id, Map.put(sessions, session_name, session_id)}
       end
+
+
+    IO.inspect("handle_call_3")
 
     :ets.insert(@name, {pid, ref, session_id, sessions})
     {:reply, session_id, Map.put(state, ref, pid)}

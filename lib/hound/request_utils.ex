@@ -39,7 +39,8 @@ defmodule Hound.RequestUtils do
       true ->
         {[], ""}
     end
-
+    IO.inspect("@http_options")
+    IO.inspect(@http_options)
     :hackney.request(type, url, headers, body, [:with_body | @http_options])
     |> handle_response({url, path, type}, options)
   end
@@ -55,7 +56,9 @@ defmodule Hound.RequestUtils do
         if options[:safe],
           do: value,
           else: raise err
-      response -> response
+      response ->
+        IO.inspect(response)
+        response
     end
   end
 
