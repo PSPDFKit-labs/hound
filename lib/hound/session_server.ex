@@ -3,6 +3,7 @@ defmodule Hound.SessionServer do
 
   use GenServer
   @name __MODULE__
+  @key :default
 
   def start_link do
     GenServer.start_link(__MODULE__, %{}, name: @name)
@@ -10,21 +11,21 @@ defmodule Hound.SessionServer do
 
 
   def session_for_pid(pid, opts) do
-    current_session_id(pid) ||
-      change_current_session_for_pid(pid, :default, opts)
+    current_session_id(@key) ||
+      change_current_session_for_pid(@key, :default, opts)
   end
 
 
   def current_session_id(pid) do
-    case :ets.lookup(@name, pid) do
-      [{^pid, _ref, session_id, _all_sessions}] -> session_id
+    case :ets.lookup(@name, @key) do
+      [{@key, _ref, session_id, _all_sessions}] -> session_id
       [] -> nil
     end
   end
 
   def current_session_name(pid) do
-    case :ets.lookup(@name, pid) do
-      [{^pid, _ref, session_id, all_sessions}] ->
+    case :ets.lookup(@name, @key) do
+      [{@key, _ref, session_id, all_sessions}] ->
         Enum.find_value all_sessions, fn
           {name, id} when id == session_id -> name
           _ -> nil
@@ -35,20 +36,20 @@ defmodule Hound.SessionServer do
 
 
   def change_current_session_for_pid(pid, session_name, opts) do
-    GenServer.call(@name, {:change_session, pid, session_name, opts}, 60000)
+    GenServer.call(@name, {:change_session, @key, session_name, opts}, 60000)
   end
 
 
   def all_sessions_for_pid(pid) do
-    case :ets.lookup(@name, pid) do
-      [{^pid, _ref, _session_id, all_sessions}] -> all_sessions
+    case :ets.lookup(@name, @key) do
+      [{@key, _ref, _session_id, all_sessions}] -> all_sessions
       [] -> %{}
     end
   end
 
 
   def destroy_sessions_for_pid(pid) do
-    GenServer.call(@name, {:destroy_sessions, pid}, 60000)
+    GenServer.call(@name, {:destroy_sessions, @key}, 60000)
   end
 
   ## Callbacks
@@ -63,11 +64,11 @@ defmodule Hound.SessionServer do
     {:ok, driver_info} = Hound.driver_info
 
     {ref, sessions} =
-      case :ets.lookup(@name, pid) do
-        [{^pid, ref, _session_id, sessions}] ->
+      case :ets.lookup(@name, @key) do
+        [{@key, ref, _session_id, sessions}] ->
           {ref, sessions}
         [] ->
-          {Process.monitor(pid), %{}}
+          {Process.monitor(self()), %{}}
       end
 
     {session_id, sessions} =
@@ -79,19 +80,19 @@ defmodule Hound.SessionServer do
           {session_id, Map.put(sessions, session_name, session_id)}
       end
 
-    :ets.insert(@name, {pid, ref, session_id, sessions})
-    {:reply, session_id, Map.put(state, ref, pid)}
+    :ets.insert(@name, {@key, ref, session_id, sessions})
+    {:reply, session_id, Map.put(state, ref, @key)}
   end
 
   def handle_call({:destroy_sessions, pid}, _from, state) do
-    destroy_sessions(pid)
+    destroy_sessions(@key)
     {:reply, :ok, state}
   end
 
   def handle_info({:DOWN, ref, _, _, _}, state) do
-    if pid = state[ref] do
-      destroy_sessions(pid)
-    end
+    # if pid = state[ref] do
+    #   destroy_sessions(pid)
+    # end
     {:noreply, state}
   end
 
@@ -103,10 +104,14 @@ defmodule Hound.SessionServer do
   end
 
   defp destroy_sessions(pid) do
-    sessions = all_sessions_for_pid(pid)
-    :ets.delete(@name, pid)
+    sessions = all_sessions_for_pid(@key)
+    :ets.delete(@name, @key)
     Enum.each sessions, fn({_session_name, session_id})->
       Hound.Session.destroy_session(session_id)
     end
+  end
+
+  defp genserver_timeout() do
+    Application.get_env(:hound, :genserver_timeout, 60000)
   end
 end
